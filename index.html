@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Perpustakaan Novel Pribadi</title>
+<style>
+    :root {
+        --bg: #121212;
+        --surface: #1e1e1e;
+        --primary: #bb86fc;
+        --text: #e0e0e0;
+        --muted: #a0a0a0;
+        --border: #333;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; }
+    body { background: var(--bg); color: var(--text); line-height: 1.6; padding-bottom: 50px; }
+    
+    /* Layout & Utility */
+    .container { max-width: 800px; margin: 0 auto; padding: 15px; }
+    .hidden { display: none !important; }
+    .btn {
+        background: var(--surface); color: var(--primary); border: 1px solid var(--primary);
+        padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: bold;
+    }
+    .btn-primary { background: var(--primary); color: #000; border: none; }
+    .btn-danger { color: #ff5252; border-color: #ff5252; }
+    input, textarea, select {
+        width: 100%; padding: 10px; margin-bottom: 10px;
+        background: var(--surface); border: 1px solid var(--border);
+        color: white; border-radius: 8px;
+    }
+    
+    /* Header */
+    header {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 15px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px;
+    }
+    h1 { font-size: 1.5rem; color: var(--primary); }
+
+    /* Grid Novel */
+    .novel-grid {
+        display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 15px;
+    }
+    .novel-card {
+        background: var(--surface); border-radius: 10px; overflow: hidden;
+        transition: transform 0.2s; cursor: pointer; position: relative;
+    }
+    .novel-card:hover { transform: translateY(-5px); }
+    .cover-img {
+        width: 100%; aspect-ratio: 2/3; object-fit: cover; background: #333;
+    }
+    .cover-placeholder {
+        width: 100%; aspect-ratio: 2/3; background: linear-gradient(45deg, #333, #444);
+        display: flex; align-items: center; justify-content: center; font-size: 2rem; color: #666;
+    }
+    .card-info { padding: 10px; }
+    .card-title { font-weight: bold; font-size: 0.9rem; margin-bottom: 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-meta { font-size: 0.75rem; color: var(--muted); }
+
+    /* Form & Editor */
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; color: var(--muted); font-size: 0.9rem; }
+    
+    /* Reader Mode */
+    #reader-view { max-width: 700px; margin: 0 auto; }
+    .reader-content {
+        font-size: 1.1rem; line-height: 1.8; white-space: pre-wrap; text-align: justify;
+        margin-top: 20px; padding: 0 10px;
+    }
+    .reader-nav {
+        display: flex; justify-content: space-between; margin-top: 30px;
+        position: sticky; bottom: 0; background: var(--bg); padding: 10px 0;
+        border-top: 1px solid var(--border);
+    }
+
+    /* Chapter List */
+    .chapter-item {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 12px; border-bottom: 1px solid var(--border);
+    }
+    .chapter-item:last-child { border-bottom: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+    <!-- HEADER -->
+    <header>
+        <h1>📚 MyNovel</h1>
+        <button class="btn" onclick="showHome()">Beranda</button>
+    </header>
+
+    <!-- VIEW: HOME (Daftar Novel) -->
+    <div id="view-home">
+        <div style="margin-bottom: 20px; display: flex; gap: 10px;">
+            <input type="text" id="search-input" placeholder="Cari judul novel..." onkeyup="renderNovels()">
+            <button class="btn btn-primary" onclick="showCreateForm()">+ Baru</button>
+        </div>
+        <div id="novel-list" class="novel-grid">
+            <!-- Novel cards will appear here -->
+        </div>
+    </div>
+
+    <!-- VIEW: FORM (Buat/Edit Novel) -->
+    <div id="view-form" class="hidden">
+        <h2 id="form-title">Tambah Novel</h2>
+        <br>
+        <div class="form-group">
+            <label>Judul Novel</label>
+            <input type="text" id="inp-title">
+        </div>
+        <div class="form-group">
+            <label>Penulis</label>
+            <input type="text" id="inp-author">
+        </div>
+        <div class="form-group">
+            <label>Sampul (Gambar)</label>
+            <input type="file" id="inp-cover" accept="image/*">
+            <img id="preview-cover" style="width: 100px; height: 150px; object-fit: cover; margin-top: 10px; display: none; border-radius: 5px;">
+        </div>
+        <div class="form-group">
+            <label>Sinopsis</label>
+            <textarea id="inp-synopsis" rows="4"></textarea>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" onclick="saveNovel()">Simpan Novel</button>
+            <button class="btn" onclick="showHome()">Batal</button>
+        </div>
+    </div>
+
+    <!-- VIEW: MANAGE (Detail Novel & Daftar Bab) -->
+    <div id="view-manage" class="hidden">
+        <div id="manage-header" style="margin-bottom: 20px;"></div>
+        
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <h3>Daftar Bab</h3>
+            <button class="btn btn-primary" onclick="showEditor()">+ Tambah Bab</button>
+        </div>
+        <div id="chapter-list"></div>
+        
+        <br>
+        <button class="btn btn-danger" onclick="deleteCurrentNovel()">Hapus Novel Ini</button>
+    </div>
+
+    <!-- VIEW: EDITOR (Tulis Bab) -->
+    <div id="view-editor" class="hidden">
+        <h3 id="editor-title">Edit Bab</h3>
+        <br>
+        <div class="form-group">
+            <label>Judul Bab</label>
+            <input type="text" id="chap-title">
+        </div>
+        <div class="form-group">
+            <label>Isi Cerita</label>
+            <textarea id="chap-content" rows="15" style="font-family: monospace;"></textarea>
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <button class="btn btn-primary" onclick="saveChapter()">Simpan Bab</button>
+            <button class="btn" onclick="showManage()">Kembali</button>
+        </div>
+    </div>
+
+    <!-- VIEW: READER (Baca Novel) -->
+    <div id="view-reader" class="hidden">
+        <div id="reader-header" style="text-align: center; margin-bottom: 20px;"></div>
+        <div id="reader-body" class="reader-content"></div>
+        
+        <div class="reader-nav">
+            <button class="btn" id="btn-prev" onclick="changeChapter(-1)">← Sebelumnya</button>
+            <button class="btn" onclick="showManage()">Daftar Bab</button>
+            <button class="btn" id="btn-next" onclick="changeChapter(1)">Selanjutnya →</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DATABASE LOGIC (IndexedDB) ---
+    const DB_NAME = 'MyNovelDB';
+    const DB_VERSION = 1;
+    let db;
+    let currentNovelId = null;
+    let currentChapterIndex = 0;
+    let tempCoverData = null;
+
+    // Inisialisasi Database
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+    
+    request.onupgradeneeded = (event) => {
+        db = event.target.result;
+        if (!db.objectStoreNames.contains('novels')) {
+            db.createObjectStore('novels', { keyPath: 'id' });
+        }
+    };
+    
+    request.onsuccess = (event) => {
+        db = event.target.result;
+        renderNovels();
+    };
+
+    request.onerror = (event) => console.error("Database error:", event.target.errorCode);
+
+    // --- HELPER FUNCTIONS ---
+    function getStore(mode) {
+        return db.transaction('novels', mode).objectStore('novels');
+    }
+
+    function generateID() {
+        return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    function showView(viewId) {
+        ['view-home', 'view-form', 'view-manage', 'view-editor', 'view-reader'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        document.getElementById(viewId).classList.remove('hidden');
+    }
+
+    // --- HOME VIEW ---
+    function showHome() {
+        showView('view-home');
+        renderNovels();
+    }
+
+    function renderNovels() {
+        const list = document.getElementById('novel-list');
+        const search = document.getElementById('search-input').value.toLowerCase();
+        list.innerHTML = '';
+
+        const transaction = getStore('readonly');
+        const request = transaction.getAll();
+
+        request.onsuccess = () => {
+            const novels = request.result;
+            novels.forEach(novel => {
+                if (novel.title.toLowerCase().includes(search)) {
+                    const card = document.createElement('div');
+                    card.className = 'novel-card';
+                    card.onclick = () => openManage(novel.id);
+                    
+                    let coverHtml = novel.cover 
+                        ? `<img src="${novel.cover}" class="cover-img">` 
+                        : `<div class="cover-placeholder">📖</div>`;
+
+                    card.innerHTML = `
+                        ${coverHtml}
+                        <div class="card-info">
+                            <div class="card-title">${novel.title}</div>
+                            <div class="card-meta">${novel.chapters ? novel.chapters.length : 0} Bab</div>
+                        </div>
+                    `;
+                    list.appendChild(card);
+                }
+            });
+        };
+    }
+
+    // --- FORM NOVEL ---
+    function showCreateForm() {
+        currentNovelId = null;
+        tempCoverData = null;
+        document.getElementById('form-title').innerText = "Tambah Novel Baru";
+        document.getElementById('inp-title').value = '';
+        document.getElementById('inp-author').value = '';
+        document.getElementById('inp-synopsis').value = '';
+        document.getElementById('inp-cover').value = '';
+        document.getElementById('preview-cover').style.display = 'none';
+        showView('view-form');
+    }
+
+    // Handle File Upload to Base64
+    document.getElementById('inp-cover').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = function() {
+                tempCoverData = reader.result;
+                const img = document.getElementById('preview-cover');
+                img.src = tempCoverData;
+                img.style.display = 'block';
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    function saveNovel() {
+        const title = document.getElementById('inp-title').value;
+        if (!title) return alert("Judul wajib diisi!");
+
+        const novel = {
+            id: currentNovelId || generateID(),
+            title: title,
+            author: document.getElementById('inp-author').value,
+            synopsis: document.getElementById('inp-synopsis').value,
+            cover: tempCoverData,
+            chapters: [] // Akan diisi jika edit, atau kosong jika baru
+        };
+
+        // Jika edit, kita perlu ambil chapter lama dulu
+        if (currentNovelId) {
+            const tx = getStore('readonly');
+            const req = tx.get(currentNovelId);
+            req.onsuccess = () => {
+                novel.chapters = req.result.chapters || [];
+                // Jika user tidak upload cover baru, pakai cover lama
+                if (!tempCoverData && req.result.cover) novel.cover = req.result.cover;
+                
+                updateNovelToDB(novel);
+            };
+        } else {
+            updateNovelToDB(novel);
+        }
+    }
+
+    function updateNovelToDB(novel) {
+        const tx = getStore('readwrite');
+        tx.put(novel);
+        tx.oncomplete = () => {
+            alert("Novel tersimpan!");
+            showHome();
+        };
+    }
+
+    // --- MANAGE NOVEL ---
+    function openManage(id) {
+        currentNovelId = id;
+        const tx = getStore('readonly');
+        const req = tx.get(id);
+        
+        req.onsuccess = () => {
+            const novel = req.result;
+            document.getElementById('manage-header').innerHTML = `
+                <h2>${novel.title}</h2>
+                <p style="color:var(--muted)">${novel.author || 'Anonim'}</p>
+                <p style="margin-top:10px; font-size:0.9rem;">${novel.synopsis || 'Tidak ada sinopsis.'}</p>
+                <br>
+                <button class="btn" onclick="editNovelDetails()">Edit Detail Novel</button>
+                <button class="btn btn-primary" onclick="startReading(0)">Baca Dari Awal</button>
+            `;
+            
+            const chapList = document.getElementById('chapter-list');
+            chapList.innerHTML = '';
+            
+            if (!novel.chapters || novel.chapters.length === 0) {
+                chapList.innerHTML = '<p style="text-align:center; color:var(--muted)">Belum ada bab.</p>';
+            } else {
+                novel.chapters.forEach((chap, index) => {
+                    const div = document.createElement('div');
+                    div.className = 'chapter-item';
+                    div.innerHTML = `
+                        <span onclick="startReading(${index})" style="cursor:pointer; flex:1;">
+                            <strong>Bab ${index + 1}:</strong> ${chap.title}
+                        </span>
+                        <div>
+                            <button class="btn" style="padding:4px 8px;" onclick="editChapter(${index})">✏️</button>
+                            <button class="btn btn-danger" style="padding:4px 8px;" onclick="deleteChapter(${index})">🗑️</button>
+                        </div>
+                    `;
+                    chapList.appendChild(div);
+                });
+            }
+            showView('view-manage');
+        };
+    }
+
+    function editNovelDetails() {
+        const tx = getStore('readonly');
+        const req = tx.get(currentNovelId);
+        req.onsuccess = () => {
+            const n = req.result;
+            document.getElementById('form-title').innerText = "Edit Novel";
+            document.getElementById('inp-title').value = n.title;
+            document.getElementById('inp-author').value = n.author;
+            document.getElementById('inp-synopsis').value = n.synopsis;
+            tempCoverData = n.cover;
+            if (n.cover) {
+                const img = document.getElementById('preview-cover');
+                img.src = n.cover;
+                img.style.display = 'block';
+            }
+            showView('view-form');
+        };
+    }
+
+    function deleteCurrentNovel() {
+        if(confirm("Yakin hapus novel ini beserta semua babnya?")) {
+            const tx = getStore('readwrite');
+            tx.delete(currentNovelId);
+            tx.oncomplete = () => showHome();
+        }
+    }
+
+    // --- EDITOR BAB ---
+    let editingChapterIndex = -1; // -1 means new chapter
+
+    function showEditor() {
+        editingChapterIndex = -1;
+        document.getElementById('editor-title').innerText = "Tambah Bab Baru";
+        document.getElementById('chap-title').value = "";
+        document.getElementById('chap-content').value = "";
+        showView('view-editor');
+    }
+
+    function editChapter(index) {
+        const tx = getStore('readonly');
+        const req = tx.get(currentNovelId);
+        req.onsuccess = () => {
+            const chap = req.result.chapters[index];
+            editingChapterIndex = index;
+            document.getElementById('editor-title').innerText = "Edit Bab " + (index + 1);
+            document.getElementById('chap-title').value = chap.title;
+            document.getElementById('chap-content').value = chap.content;
+            showView('view-editor');
+        };
+    }
+
+    function saveChapter() {
+        const title = document.getElementById('chap-title').value;
+        const content = document.getElementById('chap-content').value;
+        
+        if (!title) return alert("Judul bab wajib diisi");
+
+        const tx = getStore('readonly');
+        const req = tx.get(currentNovelId);
+        
+        req.onsuccess = () => {
+            const novel = req.result;
+            if (!novel.chapters) novel.chapters = [];
+            
+            const newChapter = { title, content, date: new Date().toISOString() };
+            
+            if (editingChapterIndex === -1) {
+                novel.chapters.push(newChapter);
+            } else {
+                novel.chapters[editingChapterIndex] = newChapter;
+            }
+            
+            const txWrite = getStore('readwrite');
+            txWrite.put(novel);
+            txWrite.oncomplete = () => {
+                alert("Bab tersimpan!");
+                openManage(currentNovelId);
+            };
+        };
+    }
+
+    function deleteChapter(index) {
+        if(!confirm("Hapus bab ini?")) return;
+        
+        const tx = getStore('readonly');
+        const req = tx.get(currentNovelId);
+        
+        req.onsuccess = () => {
+            const novel = req.result;
+            novel.chapters.splice(index, 1);
+            
+            const txWrite = getStore('readwrite');
+            txWrite.put(novel);
+            txWrite.oncomplete = () => openManage(currentNovelId);
+        };
+    }
+
+    // --- READER MODE ---
+    function startReading(index) {
+        currentChapterIndex = index;
+        loadChapterContent();
+        showView('view-reader');
+    }
+
+    function loadChapterContent() {
+        const tx = getStore('readonly');
+        const req = tx.get(currentNovelId);
+        
+        req.onsuccess = () => {
+            const novel = req.result;
+            const chap = novel.chapters[currentChapterIndex];
+            
+            document.getElementById('reader-header').innerHTML = `
+                <h3>${novel.title}</h3>
+                <h2 style="color:var(--primary)">Bab ${currentChapterIndex + 1}: ${chap.title}</h2>
+            `;
+            document.getElementById('reader-body').innerText = chap.content;
+            
+            // Button logic
+            document.getElementById('btn-prev').disabled = (currentChapterIndex === 0);
+            document.getElementById('btn-next').disabled = (currentChapterIndex === novel.chapters.length - 1);
+            
+            // Scroll to top
+            window.scrollTo(0,0);
+        };
+    }
+
+    function changeChapter(direction) {
+        currentChapterIndex += direction;
+        loadChapterContent();
+        window.scrollTo(0,0);
+    }
+
+    function showManage() {
+        openManage(currentNovelId);
+    }
+
+</script>
+</body>
+</html>
